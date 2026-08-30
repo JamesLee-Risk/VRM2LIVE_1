@@ -1,0 +1,14 @@
+# 原始碼統一以 LF 存於版本庫，取出時由各平台決定
+* text=auto eol=lf
+
+# 啟動器必須逐位元組保存，不得做任何換行正規化。
+# 原因：本檔以 Big5 (cp950) 編碼儲存（cmd.exe 以系統 OEM 編碼讀取批次檔），
+# 且依賴 CRLF。任何自動轉換都可能讓中文訊息或流程控制解析錯亂。
+*.bat -text
+
+# 二進位資產
+*.vrm  -text
+*.vrma -text
+*.png  binary
+*.jpg  binary
+*.task binary

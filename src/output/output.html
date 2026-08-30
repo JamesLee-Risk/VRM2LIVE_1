@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <!-- 與主視窗相同的政策；blob: 為載入 GLB 內嵌貼圖所必需 -->
+    <meta http-equiv="Content-Security-Policy"
+          content="default-src 'self'; script-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' blob: data: ws://127.0.0.1:* http://127.0.0.1:*; worker-src 'self' blob:;" />
+    <title>VRM2LIVE 輸出</title>
+    <style>
+      /* 此頁面供 OBS 瀏覽器來源擷取。
+         背景必須完全透明，且不得出現任何介面元素或游標（FR-15-14）。 */
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: transparent;
+        cursor: none;
+      }
+
+      canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+
+      /* 連線狀態僅在尚未收到資料時顯示，收到第一幀後即永久移除。
+         加上 ?silent=1 可完全停用。 */
+      #status {
+        position: fixed;
+        top: 8px;
+        left: 8px;
+        padding: 5px 10px;
+        border-radius: 4px;
+        background: rgba(0, 0, 0, 0.6);
+        color: #dfe3ec;
+        font: 12px/1.4 system-ui, sans-serif;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="stage"></canvas>
+    <div id="status">VRM2LIVE：等待主視窗連線…</div>
+    <script type="module" src="./output.js"></script>
+  </body>
+</html>

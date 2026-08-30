@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <!-- connect-src 必須含 blob:：GLTFLoader 會把 GLB 內嵌的貼圖抽成 Blob URL
+         再以 fetch 讀回，缺少 blob: 會使所有材質貼圖靜默失敗、模型呈現全白。 -->
+    <meta http-equiv="Content-Security-Policy"
+          content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' blob: data: ws://127.0.0.1:* http://127.0.0.1:*; worker-src 'self' blob:;" />
+    <title>VRM2LIVE</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <!-- ── 側邊面板 ─────────────────────────────────────── -->
+      <aside id="sidebar">
+        <header class="brand">
+          <span class="logo">VRM<b>2</b>LIVE</span>
+          <span class="ver" id="app-version"></span>
+        </header>
+
+        <nav class="tabs" role="tablist">
+          <button class="tab active" data-tab="model" role="tab">模型</button>
+          <button class="tab" data-tab="tracking" role="tab">追蹤</button>
+          <button class="tab" data-tab="expression" role="tab">表情</button>
+          <button class="tab" data-tab="animation" role="tab">動畫</button>
+          <button class="tab" data-tab="hotkey" role="tab">熱鍵</button>
+          <button class="tab" data-tab="mapping" role="tab">映射</button>
+          <button class="tab" data-tab="scene" role="tab">場景</button>
+          <button class="tab" data-tab="output" role="tab">輸出</button>
+        </nav>
+
+        <div class="panels">
+          <!-- 模型 -->
+          <section class="panel active" data-panel="model">
+            <div class="row-actions">
+              <button id="btn-import-model" class="primary">匯入 VRM…</button>
+              <button id="btn-open-models">開啟資料夾</button>
+              <button id="btn-rescan">重新掃描</button>
+            </div>
+            <div id="model-list" class="list"></div>
+            <div id="model-meta" class="meta-box hidden"></div>
+          </section>
+
+          <!-- 追蹤 -->
+          <section class="panel" data-panel="tracking">
+            <div class="field">
+              <label>攝影機</label>
+              <select id="camera-select"></select>
+            </div>
+            <div class="row-actions">
+              <button id="btn-track-toggle" class="primary">開始追蹤</button>
+              <button id="btn-calibrate">校準</button>
+            </div>
+            <p class="privacy-note">
+              基於隱私原則，本軟體在任何介面均不顯示攝影機畫面（FR-02-20）。
+            </p>
+
+            <div class="field">
+              <label>追蹤 FPS <output id="out-track-fps">30</output></label>
+              <input type="range" id="track-fps" min="10" max="60" step="5" value="30" />
+            </div>
+            <div class="field">
+              <label>渲染 FPS 上限 <output id="out-render-fps">60</output></label>
+              <input type="range" id="render-fps" min="24" max="120" step="6" value="60" />
+            </div>
+
+            <div class="field checkbox">
+              <label><input type="checkbox" id="chk-mirror" checked /> 鏡像（像照鏡子）</label>
+            </div>
+            <div class="field checkbox">
+              <label><input type="checkbox" id="chk-swap-eyes" /> 對調左右眼</label>
+            </div>
+
+            <div class="field">
+              <label>追蹤遺失時</label>
+              <select id="lost-behavior">
+                <option value="freeze">凍結於當前姿勢</option>
+                <option value="reset">平滑回復預設姿勢</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label>眨眼連動</label>
+              <select id="blink-link">
+                <option value="never">永不連動</option>
+                <option value="always">永遠連動（取平均）</option>
+                <option value="onHeadTurn">頭部大幅轉動時連動</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label>輸入死區 <output id="out-deadzone">0.01</output></label>
+              <input type="range" id="deadzone" min="0" max="0.1" step="0.005" value="0.01" />
+            </div>
+
+            <h4>語音口型</h4>
+            <div class="field">
+              <label>麥克風</label>
+              <select id="mic-select"></select>
+            </div>
+            <div class="row-actions">
+              <button id="btn-mic-toggle" class="primary">開始語音</button>
+              <button id="btn-mic-mute">靜音</button>
+            </div>
+            <div class="vu"><i id="vu-fill"></i></div>
+
+            <div class="field">
+              <label>口型來源</label>
+              <select id="mouth-source">
+                <option value="mixed">混合（取兩者較大值）</option>
+                <option value="mic">僅麥克風</option>
+                <option value="camera">僅攝影機</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>音量增益 <output id="out-vgain">4.0</output></label>
+              <input type="range" id="voice-gain" min="0.5" max="12" step="0.5" value="4" />
+            </div>
+            <div class="field">
+              <label>噪音閘 <output id="out-vcut">0.015</output></label>
+              <input type="range" id="voice-cutoff" min="0" max="0.2" step="0.005" value="0.015" />
+            </div>
+            <div class="field">
+              <label>頻率增益 <output id="out-vfreq">1.0</output></label>
+              <input type="range" id="voice-freq" min="0.2" max="3" step="0.1" value="1" />
+            </div>
+
+            <p class="hint">
+              母音校準：按下按鈕後持續發出該母音約 1 秒。若模型口型與你的聲音對不上，
+              校準通常能顯著改善（不同人的共振峰頻率差異可達 ±15%）。
+            </p>
+            <div class="vowel-cal" id="vowel-cal">
+              <button data-vowel="a">A</button>
+              <button data-vowel="i">I</button>
+              <button data-vowel="u">U</button>
+              <button data-vowel="e">E</button>
+              <button data-vowel="o">O</button>
+              <button id="btn-cal-reset" title="還原為內建樣板">重設</button>
+            </div>
+            <div id="vowel-weights" class="vowel-weights"></div>
+
+            <h4>靈敏度</h4>
+            <div class="field"><label>頭部旋轉 <output id="out-sens-headRotation">1.0</output></label>
+              <input type="range" class="sens" data-sens="headRotation" min="0" max="3" step="0.1" value="1" /></div>
+            <div class="field"><label>頭部位移 <output id="out-sens-headPosition">1.0</output></label>
+              <input type="range" class="sens" data-sens="headPosition" min="0" max="3" step="0.1" value="1" /></div>
+            <div class="field"><label>眼睛 <output id="out-sens-eye">1.0</output></label>
+              <input type="range" class="sens" data-sens="eye" min="0" max="3" step="0.1" value="1" /></div>
+            <div class="field"><label>眉毛 <output id="out-sens-brow">1.0</output></label>
+              <input type="range" class="sens" data-sens="brow" min="0" max="3" step="0.1" value="1" /></div>
+            <div class="field"><label>嘴巴 <output id="out-sens-mouth">1.0</output></label>
+              <input type="range" class="sens" data-sens="mouth" min="0" max="3" step="0.1" value="1" /></div>
+          </section>
+
+          <!-- 表情 -->
+          <section class="panel" data-panel="expression">
+            <div class="row-actions">
+              <button id="btn-clear-expressions">清除所有表情</button>
+            </div>
+            <p class="hint">點擊即可開關表情，不需先建立熱鍵（FR-05-08）。</p>
+            <div id="expression-list" class="list"></div>
+          </section>
+
+          <!-- 動畫 -->
+          <section class="panel" data-panel="animation">
+            <div class="row-actions">
+              <button id="btn-anim-rescan" class="primary">重新掃描</button>
+              <button id="btn-open-animations">開啟資料夾</button>
+            </div>
+            <p class="hint">
+              支援 <code>.vrma</code>（VRM Animation）與 <code>.bvh</code>。
+              把檔案放進 <code>Animations/</code> 資料夾後按重新掃描。
+            </p>
+
+            <h4>循環待機動畫</h4>
+            <div class="field">
+              <label>動畫</label>
+              <select id="idle-anim"><option value="">（無）</option></select>
+            </div>
+            <p class="hint">
+              待機動畫的優先權低於臉部追蹤，因此身體會動、頭部仍跟著你轉。
+            </p>
+
+            <h4>一次性動畫</h4>
+            <div class="field">
+              <label>骨骼遮罩</label>
+              <select id="anim-mask">
+                <option value="full">全身</option>
+                <option value="upper">僅上半身</option>
+                <option value="lower">僅下半身</option>
+                <option value="arms">僅手臂</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>淡入淡出 <output id="out-anim-fade">0.20</output> 秒</label>
+              <input type="range" id="anim-fade" min="0" max="2" step="0.05" value="0.2" />
+            </div>
+            <div class="field">
+              <label>播放速度 <output id="out-anim-speed">1.0</output>×</label>
+              <input type="range" id="anim-speed" min="0.25" max="2" step="0.05" value="1" />
+            </div>
+            <div class="field checkbox">
+              <label><input type="checkbox" id="chk-stop-last" /> 停在最後一幀</label>
+            </div>
+            <p class="hint">
+              「停在最後一幀」不會凍結由追蹤驅動的骨骼——那些骨骼在動畫結束後會自動交還給追蹤。
+            </p>
+            <div class="row-actions">
+              <button id="btn-anim-stop">停止一次性動畫</button>
+            </div>
+            <div id="anim-list" class="list"></div>
+
+            <h4>靜態姿勢</h4>
+            <p class="hint">
+              把目前的骨骼姿勢存成可開關的姿勢，供 <code>TogglePose</code> 熱鍵使用。
+            </p>
+            <div class="row-actions">
+              <button id="btn-pose-save">儲存目前姿勢</button>
+              <button id="btn-pose-clear">清除套用中的姿勢</button>
+            </div>
+            <div id="pose-list" class="list"></div>
+          </section>
+
+          <!-- 熱鍵 -->
+          <section class="panel" data-panel="hotkey">
+            <div class="row-actions">
+              <button id="btn-hotkey-add" class="primary">新增熱鍵</button>
+              <button id="btn-hotkey-expressions">為所有表情建立</button>
+            </div>
+            <div id="hotkey-conflicts" class="notes hidden"></div>
+            <div id="hotkey-register-status" class="notes hidden"></div>
+            <p class="hint">
+              小鍵盤數字可獨立綁定（顯示為「小鍵盤1」），與主鍵盤數字列互不衝突。
+              可搭配最多兩個修飾鍵，例如 <code>Ctrl + 小鍵盤1</code>，避免打字時誤觸。
+            </p>
+            <div id="hotkey-list" class="list"></div>
+
+            <h4>畫面按鈕</h4>
+            <p class="hint">
+              最多 8 個，顯示於舞台右側。輸出畫面中不會包含這些按鈕（FR-15-14）。
+            </p>
+            <div class="field checkbox">
+              <label><input type="checkbox" id="chk-screen-buttons" checked /> 顯示畫面按鈕</label>
+            </div>
+            <div class="field">
+              <label>透明度 <output id="out-btn-opacity">0.75</output></label>
+              <input type="range" id="btn-opacity" min="0.1" max="1" step="0.05" value="0.75" />
+            </div>
+
+            <h4>外部觸發</h4>
+            <p class="hint">
+              供 Stream Deck 等工具以 HTTP 觸發。僅綁定 127.0.0.1，且必須帶權杖。
+            </p>
+            <div class="field checkbox">
+              <label><input type="checkbox" id="chk-hotkey-api" /> 啟用 HTTP 觸發</label>
+            </div>
+            <div class="url-box hidden" id="hotkey-api-box">
+              <input type="text" id="hotkey-api-url" readonly />
+              <button id="btn-copy-api">複製</button>
+            </div>
+          </section>
+
+          <!-- 映射 -->
+          <section class="panel" data-panel="mapping">
+            <div class="row-actions">
+              <button id="btn-autosetup" class="primary">執行自動設定</button>
+              <button id="btn-reset-mappings" class="danger">重設全部映射</button>
+            </div>
+            <div id="autosetup-notes" class="notes hidden"></div>
+            <div id="mapping-list" class="list mapping"></div>
+          </section>
+
+          <!-- 場景 -->
+          <section class="panel" data-panel="scene">
+            <h4>背景</h4>
+            <div class="field">
+              <label>模式</label>
+              <select id="bg-mode">
+                <option value="transparent">透明（串流用）</option>
+                <option value="color">純色</option>
+                <option value="image">圖片</option>
+                <option value="video">影片</option>
+              </select>
+            </div>
+            <div class="field" id="bg-color-field">
+              <label>顏色</label>
+              <input type="color" id="bg-color" value="#00b140" />
+            </div>
+            <div class="field hidden" id="bg-file-field">
+              <label>檔案</label>
+              <select id="bg-file"></select>
+            </div>
+            <button id="btn-open-backgrounds">開啟背景資料夾</button>
+
+            <h4>光照</h4>
+            <div class="field"><label>環境光強度 <output id="out-ambient">0.85</output></label>
+              <input type="range" id="ambient-intensity" min="0" max="4" step="0.05" value="0.85" /></div>
+            <div class="field"><label>環境光顏色</label><input type="color" id="ambient-color" value="#ffffff" /></div>
+            <div class="field"><label>方向光強度 <output id="out-dir">0.95</output></label>
+              <input type="range" id="dir-intensity" min="0" max="4" step="0.05" value="0.95" /></div>
+            <div class="field"><label>方向光顏色</label><input type="color" id="dir-color" value="#ffffff" /></div>
+            <div class="field"><label>方位角 <output id="out-azimuth">30</output>°</label>
+              <input type="range" id="dir-azimuth" min="-180" max="180" step="5" value="30" /></div>
+            <div class="field"><label>仰角 <output id="out-elevation">45</output>°</label>
+              <input type="range" id="dir-elevation" min="-30" max="90" step="5" value="45" /></div>
+            <div class="field"><label>邊緣光強度 <output id="out-rim">0.0</output></label>
+              <input type="range" id="rim-intensity" min="0" max="3" step="0.1" value="0" /></div>
+            <div class="field"><label>邊緣光顏色</label><input type="color" id="rim-color" value="#aaccff" /></div>
+
+            <h4>攝影機與模型</h4>
+            <div class="field">
+              <label>取景</label>
+              <select id="camera-preset">
+                <option value="full">全身</option>
+                <option value="half" selected>半身</option>
+                <option value="face">臉部特寫</option>
+              </select>
+            </div>
+            <div class="field checkbox">
+              <label><input type="checkbox" id="chk-lock-model" /> 鎖定模型位置</label>
+            </div>
+            <p class="hint">拖曳＝移動、滾輪＝縮放、右鍵拖曳＝旋轉。</p>
+            <button id="btn-reset-transform">重設模型變換</button>
+          </section>
+
+          <!-- 輸出 -->
+          <section class="panel" data-panel="output">
+            <h4>OBS 瀏覽器來源（建議）</h4>
+            <p class="hint">
+              在 OBS 新增「瀏覽器」來源，貼上下列網址即可取得**帶透明通道**、不含任何介面的畫面。
+            </p>
+            <div class="url-box">
+              <input type="text" id="output-url" readonly />
+              <button id="btn-copy-url">複製</button>
+            </div>
+            <div class="field">
+              <label>輸出解析度</label>
+              <select id="output-res">
+                <option value="1920x1080">1920 × 1080</option>
+                <option value="1280x720">1280 × 720</option>
+                <option value="1080x1920">1080 × 1920（直式）</option>
+              </select>
+            </div>
+            <p class="hint" id="output-status">尚未有來源連線。</p>
+            <ol class="steps">
+              <li>OBS →「來源」→ 加入「瀏覽器」</li>
+              <li>貼上上方網址，寬高設為與上面相同</li>
+              <li>勾選「不可見時關閉來源」以節省資源</li>
+            </ol>
+
+            <h4>截圖</h4>
+            <div class="row-actions">
+              <button id="btn-screenshot" class="primary">拍攝截圖</button>
+              <button id="btn-open-screenshots">開啟資料夾</button>
+            </div>
+            <div class="field checkbox">
+              <label><input type="checkbox" id="chk-shot-bg" /> 包含背景（不勾選則為透明 PNG）</label>
+            </div>
+
+            <h4>串流模式</h4>
+            <p class="hint">隱藏所有介面疊層，供 OBS 視窗擷取使用（FR-15-05）。</p>
+            <button id="btn-stream-mode">進入串流模式</button>
+          </section>
+        </div>
+      </aside>
+
+      <!-- ── 舞台 ─────────────────────────────────────────── -->
+      <main id="stage-area">
+        <canvas id="stage"></canvas>
+
+        <div id="hud">
+          <div class="hud-item"><span id="hud-render-fps">--</span> FPS</div>
+          <div class="hud-item"><span id="hud-track-fps">--</span> 追蹤</div>
+          <div class="hud-item" id="hud-face">未偵測</div>
+          <div class="hud-item" id="hud-clients">輸出 0</div>
+        </div>
+
+        <button id="btn-exit-stream" class="hidden">離開串流模式</button>
+
+        <div id="screen-buttons"></div>
+
+        <div id="toast-area"></div>
+
+        <div id="empty-state">
+          <h2>尚未載入模型</h2>
+          <p>請在「模型」分頁匯入 <code>.vrm</code> 檔案，或把檔案放入 <code>Models/</code> 資料夾。</p>
+        </div>
+      </main>
+
+      <!-- ── 參數監看器（FR-02-30）────────────────────────── -->
+      <section id="monitor" class="collapsed">
+        <header id="monitor-header">
+          <span>參數監看器</span>
+          <button id="btn-monitor-toggle">展開</button>
+        </header>
+        <div id="monitor-body"></div>
+      </section>
+    </div>
+
+    <script type="module" src="./renderer.js"></script>
+  </body>
+</html>

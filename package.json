@@ -1,0 +1,33 @@
+{
+  "name": "vrm2live",
+  "version": "0.1.0",
+  "description": "VRM 虛擬形象直播軟體（簡易版）",
+  "main": "src/main/main.js",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "watch": "node scripts/build.mjs --watch",
+    "start": "npm run build && electron .",
+    "dev": "npm run build && electron . --dev",
+    "fetch-assets": "node scripts/fetch-assets.mjs",
+    "test:dsp": "node scripts/test-dsp.mjs",
+    "make-anims": "node scripts/make-test-animations.mjs",
+    "test:hotkeys": "node scripts/test-hotkeys.mjs",
+    "test": "node scripts/test-dsp.mjs && node scripts/test-hotkeys.mjs"
+  },
+  "dependencies": {
+    "@mediapipe/tasks-vision": "^0.10.22",
+    "@pixiv/three-vrm": "^3.4.4",
+    "@pixiv/three-vrm-animation": "^3.5.5",
+    "three": "^0.180.0",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "electron": "^38.2.2",
+    "esbuild": "^0.25.11"
+  },
+  "allowScripts": {
+    "electron@38.8.6": true,
+    "esbuild@0.25.12": true
+  }
+}

@@ -1,0 +1,34 @@
+# 相依套件與建置產物
+node_modules/
+build/
+
+# 免安裝版 Node（由開發者自行下載，見 README）
+.tools/
+
+# 建置期下載的外部資產（見 npm run fetch-assets）
+vendor/
+
+# 執行期產生的使用者資料
+Logs/
+Backups/
+Config/
+Models/*.vrmlive.json
+Models/*.vrmlive.json.corrupt-*
+
+# 使用者素材（模型檔通常有授權限制，不應進版控）
+#
+# 注意：*.vrm 一律排除，不限於 Models/ 底下。
+# 本專案附帶的範例模型授權為 Redistribution_Prohibited（禁止再散布），
+# 把它推上公開儲存庫即構成再散布，會違反作者授權。
+*.vrm
+Models/*.vrm
+Backgrounds/*
+Sounds/*
+Animations/*
+!Backgrounds/.gitkeep
+!Sounds/.gitkeep
+!Animations/.gitkeep
+
+# 暫存
+*.tmp
+*.log

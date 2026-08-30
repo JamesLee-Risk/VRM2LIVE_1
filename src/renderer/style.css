@@ -1,0 +1,927 @@
+/* VRM2LIVE 工作室介面樣式 */
+
+:root {
+  --bg: #14161c;
+  --bg-panel: #1b1e26;
+  --bg-raised: #232733;
+  --bg-input: #11131a;
+  --line: #2e3442;
+  --text: #dfe3ec;
+  --text-dim: #8d95a8;
+  --accent: #4da3ff;
+  --accent-dim: #2c6bb0;
+  --danger: #e0575f;
+  --ok: #4fc98a;
+  --warn: #e2b04a;
+  --radius: 6px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font: 13px/1.5 "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif;
+  user-select: none;
+}
+
+#app {
+  display: grid;
+  grid-template-columns: 336px 1fr;
+  grid-template-rows: 1fr auto;
+  grid-template-areas:
+    "sidebar stage"
+    "monitor monitor";
+  height: 100%;
+}
+
+/* ── 側邊面板 ──────────────────────────────────────────── */
+
+#sidebar {
+  grid-area: sidebar;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-panel);
+  border-right: 1px solid var(--line);
+  min-height: 0;
+}
+
+.brand {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 14px 16px 10px;
+}
+
+.logo {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.logo b {
+  color: var(--accent);
+}
+
+.ver {
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.tab {
+  flex: 1;
+  padding: 8px 4px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.tab:hover {
+  color: var(--text);
+}
+
+.tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.panels {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.panel {
+  display: none;
+  padding: 14px 16px 28px;
+}
+
+.panel.active {
+  display: block;
+}
+
+.panel h4 {
+  margin: 20px 0 8px;
+  font-size: 12px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.panel h4:first-child {
+  margin-top: 0;
+}
+
+/* ── 控制項 ────────────────────────────────────────────── */
+
+button {
+  padding: 7px 12px;
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--accent-dim);
+  background: #2a3040;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+button.primary {
+  background: var(--accent-dim);
+  border-color: var(--accent-dim);
+  color: #fff;
+}
+
+button.primary:hover:not(:disabled) {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+button.danger:hover:not(:disabled) {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.field {
+  margin-bottom: 10px;
+}
+
+.field > label {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.field.checkbox > label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+select,
+input[type="text"] {
+  width: 100%;
+  padding: 6px 8px;
+  background: var(--bg-input);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+}
+
+input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+input[type="color"] {
+  width: 100%;
+  height: 28px;
+  padding: 2px;
+  background: var(--bg-input);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+output {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.hint {
+  margin: 6px 0 12px;
+  color: var(--text-dim);
+  font-size: 11.5px;
+  line-height: 1.6;
+}
+
+.privacy-note {
+  margin: 8px 0 14px;
+  padding: 8px 10px;
+  background: rgba(79, 201, 138, 0.08);
+  border-left: 2px solid var(--ok);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  color: var(--text-dim);
+  font-size: 11.5px;
+  line-height: 1.6;
+}
+
+.steps {
+  margin: 8px 0 0;
+  padding-left: 20px;
+  color: var(--text-dim);
+  font-size: 11.5px;
+  line-height: 1.9;
+}
+
+.notes {
+  margin-bottom: 12px;
+  padding: 9px 11px;
+  background: rgba(226, 176, 74, 0.08);
+  border-left: 2px solid var(--warn);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  font-size: 11.5px;
+  line-height: 1.7;
+}
+
+.notes ul {
+  margin: 0;
+  padding-left: 16px;
+}
+
+/* ── 清單 ──────────────────────────────────────────────── */
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.list-item {
+  padding: 8px 10px;
+  background: var(--bg-raised);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.list-item:hover {
+  border-color: var(--accent-dim);
+}
+
+.list-item.active {
+  border-color: var(--accent);
+  background: #26303f;
+}
+
+.list-item.error {
+  border-color: var(--danger);
+  cursor: default;
+}
+
+.list-item .title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.list-item .name {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.list-item .sub {
+  margin-top: 2px;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.badge {
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: var(--bg-input);
+  color: var(--text-dim);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.badge.spec {
+  background: var(--accent-dim);
+  color: #fff;
+}
+
+.badge.warn {
+  background: rgba(226, 176, 74, 0.2);
+  color: var(--warn);
+}
+
+.badge.on {
+  background: var(--ok);
+  color: #0d1b13;
+}
+
+/* 表情列 */
+.expr-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.expr-item .weight-bar {
+  flex: 1;
+  height: 3px;
+  background: var(--bg-input);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.expr-item .weight-fill {
+  height: 100%;
+  background: var(--accent);
+  width: 0;
+}
+
+/* 映射列 */
+.list.mapping .list-item {
+  cursor: default;
+}
+
+.map-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.map-io {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 5px;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.track {
+  position: relative;
+  flex: 1;
+  height: 4px;
+  background: var(--bg-input);
+  border-radius: 2px;
+}
+
+/* FR-03-05：以即時指示點顯示當前值在區間中的相對位置 */
+.dot {
+  position: absolute;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  margin-left: -3.5px;
+  border-radius: 50%;
+  background: var(--accent);
+  transform: translateY(-50%);
+}
+
+/* ── 語音口型 ──────────────────────────────────────────── */
+
+.vu {
+  height: 5px;
+  margin: -4px 0 12px;
+  background: var(--bg-input);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.vu i {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: linear-gradient(90deg, var(--ok), var(--warn) 78%, var(--danger));
+  transition: width 60ms linear;
+}
+
+.vowel-cal {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.vowel-cal button {
+  padding: 6px 0;
+  font-weight: 600;
+}
+
+.vowel-cal button.recording {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.vowel-cal button.calibrated::after {
+  content: "•";
+  margin-left: 3px;
+  color: var(--ok);
+}
+
+.vowel-weights {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.vowel-weights div {
+  text-align: center;
+  font-size: 10.5px;
+  color: var(--text-dim);
+}
+
+.vowel-weights .bar {
+  height: 3px;
+  margin-top: 3px;
+  background: var(--bg-input);
+  border-radius: 2px;
+}
+
+.vowel-weights .bar i {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+}
+
+.meta-box {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: var(--bg-raised);
+  border-radius: var(--radius);
+  font-size: 11.5px;
+  line-height: 1.7;
+}
+
+.meta-box dt {
+  color: var(--text-dim);
+  float: left;
+  clear: left;
+  width: 62px;
+}
+
+.meta-box dd {
+  margin: 0 0 2px 68px;
+  word-break: break-all;
+}
+
+.meta-box .restriction {
+  margin-top: 8px;
+  padding: 6px 9px;
+  background: rgba(224, 87, 95, 0.12);
+  border-radius: var(--radius);
+  color: #f0a8ac;
+}
+
+/* ── 舞台 ──────────────────────────────────────────────── */
+
+#stage-area {
+  grid-area: stage;
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(45deg, #1a1d24 25%, transparent 25%) 0 0 / 24px 24px,
+    linear-gradient(-45deg, #1a1d24 25%, transparent 25%) 0 12px / 24px 24px,
+    linear-gradient(45deg, transparent 75%, #1a1d24 75%) 12px -12px / 24px 24px,
+    linear-gradient(-45deg, transparent 75%, #1a1d24 75%) -12px 0 / 24px 24px,
+    #16181f;
+}
+
+#stage {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+#hud {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  display: flex;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.hud-item {
+  padding: 3px 8px;
+  background: rgba(10, 12, 16, 0.72);
+  border-radius: 4px;
+  color: var(--text-dim);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-item span {
+  color: var(--text);
+}
+
+.hud-item.ok {
+  color: var(--ok);
+}
+
+#btn-exit-stream {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 20;
+}
+
+/* ── 畫面按鈕（FR-07-03）───────────────────────────────── */
+
+#screen-buttons {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transform: translateY(-50%);
+  z-index: 10;
+}
+
+#screen-buttons button {
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 50%;
+  background: rgba(30, 36, 48, 0.8);
+  color: var(--text);
+  font-size: 11px;
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+#screen-buttons button:hover {
+  border-color: #fff;
+}
+
+#screen-buttons button:active {
+  transform: scale(0.93);
+}
+
+/* 串流模式與輸出畫面都不得出現按鈕（FR-15-14） */
+body.stream-mode #screen-buttons {
+  display: none;
+}
+
+/* ── 熱鍵編輯 ──────────────────────────────────────────── */
+
+.hotkey-item .row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.hotkey-item .row > select,
+.hotkey-item .row > input[type="text"] {
+  flex: 1;
+  min-width: 0;
+}
+
+.key-capture {
+  min-width: 92px;
+  font-variant-numeric: tabular-nums;
+}
+
+.key-capture.listening {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.action-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.action-row select {
+  flex: 1;
+  min-width: 0;
+}
+
+.action-row button {
+  padding: 4px 7px;
+}
+
+.hotkey-item .small {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.hotkey-item .small label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.hotkey-item .small input[type="number"] {
+  width: 52px;
+  padding: 3px 5px;
+  background: var(--bg-input);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--text);
+  font: inherit;
+  font-size: 11px;
+}
+
+#empty-state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+  text-align: center;
+  pointer-events: none;
+}
+
+#empty-state h2 {
+  margin: 0 0 6px;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 500;
+}
+
+#empty-state code {
+  padding: 1px 5px;
+  background: var(--bg-raised);
+  border-radius: 3px;
+  font-size: 12px;
+}
+
+/* ── 參數監看器 ────────────────────────────────────────── */
+
+#monitor {
+  grid-area: monitor;
+  background: var(--bg-panel);
+  border-top: 1px solid var(--line);
+}
+
+#monitor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 14px;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+#monitor-body {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 3px 16px;
+  max-height: 190px;
+  padding: 4px 14px 12px;
+  overflow-y: auto;
+}
+
+#monitor.collapsed #monitor-body {
+  display: none;
+}
+
+.mon-row {
+  display: grid;
+  grid-template-columns: 1fr 46px 52px;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+}
+
+.mon-row.unavailable {
+  opacity: 0.35;
+}
+
+.mon-row .mon-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-dim);
+}
+
+.mon-row .mon-val {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.mon-bar {
+  position: relative;
+  height: 3px;
+  background: var(--bg-input);
+  border-radius: 2px;
+}
+
+.mon-bar i {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+}
+
+/* ── 串流模式（FR-15-05、FR-15-14）─────────────────────── */
+
+body.stream-mode #sidebar,
+body.stream-mode #monitor,
+body.stream-mode #hud,
+body.stream-mode /* ── 畫面按鈕（FR-07-03）───────────────────────────────── */
+
+#screen-buttons {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transform: translateY(-50%);
+  z-index: 10;
+}
+
+#screen-buttons button {
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 50%;
+  background: rgba(30, 36, 48, 0.8);
+  color: var(--text);
+  font-size: 11px;
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+#screen-buttons button:hover {
+  border-color: #fff;
+}
+
+#screen-buttons button:active {
+  transform: scale(0.93);
+}
+
+/* 串流模式與輸出畫面都不得出現按鈕（FR-15-14） */
+body.stream-mode #screen-buttons {
+  display: none;
+}
+
+/* ── 熱鍵編輯 ──────────────────────────────────────────── */
+
+.hotkey-item .row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.hotkey-item .row > select,
+.hotkey-item .row > input[type="text"] {
+  flex: 1;
+  min-width: 0;
+}
+
+.key-capture {
+  min-width: 92px;
+  font-variant-numeric: tabular-nums;
+}
+
+.key-capture.listening {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.action-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.action-row select {
+  flex: 1;
+  min-width: 0;
+}
+
+.action-row button {
+  padding: 4px 7px;
+}
+
+.hotkey-item .small {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.hotkey-item .small label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.hotkey-item .small input[type="number"] {
+  width: 52px;
+  padding: 3px 5px;
+  background: var(--bg-input);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--text);
+  font: inherit;
+  font-size: 11px;
+}
+
+#empty-state {
+  display: none;
+}
+
+body.stream-mode #app {
+  grid-template-columns: 1fr;
+  grid-template-areas: "stage";
+}
+
+body.stream-mode #stage-area {
+  background: none;
+}
+
+/* ── 提示訊息 ──────────────────────────────────────────── */
+
+#toast-area {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.toast {
+  padding: 8px 14px;
+  background: rgba(20, 24, 32, 0.94);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-size: 12px;
+  animation: toast-in 0.18s ease-out;
+}
+
+.toast.error {
+  border-color: var(--danger);
+  color: #f0a8ac;
+}
+
+.toast.ok {
+  border-color: var(--ok);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.hidden {
+  display: none !important;
+}
