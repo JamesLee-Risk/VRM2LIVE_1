@@ -48,6 +48,34 @@ function defaultAppConfig() {
         // 口型來源三選一（FR-02-48）：mic / camera / mixed
         mouthSource: 'mixed',
       },
+      // 身體追蹤（FR-02-D）。預設 face＝維持原本「僅臉部＋軀幹」的行為
+      body: {
+        mode: 'face', // 'face' | 'half' | 'full'
+        quality: 'lite', // 姿態模型精度（FR-02-71）：lite / full
+        fps: 30, // 獨立於臉部追蹤的取樣率（FR-02-70）
+        smooth: 45, // 0–100，以球面插值套用（FR-02-72）
+        fadeSeconds: 0.35, // 模式切換淡接（FR-02-68）
+        handTwist: 0.5, // 手腕扭轉讓給前臂的比例
+        // 逐部位開關（FR-02-69）
+        parts: {
+          torso: true,
+          shoulders: true,
+          arms: true,
+          hands: true,
+          legs: true,
+          rootMotion: false,
+        },
+        // 逐部位靈敏度
+        sensitivity: {
+          torso: 1,
+          shoulders: 1,
+          arms: 1,
+          hands: 1,
+          fingers: 1,
+          legs: 1,
+          rootMotion: 1,
+        },
+      },
     },
     scene: {
       background: { mode: 'transparent', color: '#00b140', url: null },
@@ -97,7 +125,9 @@ function defaultModelConfig(modelName) {
     transformPresets: {},
     transform: { x: 0, y: 0, z: 0, rotY: 0, scale: 1 },
     camera: { preset: 'half', fov: 30 },
-    springBone: { intensity: 1, colliders: true },
+    // 搖動骨骼（FR-01-13）。gravity 為**追加**值：多數模型匯出時 gravityPower 為 0，
+    // 頭髮因而停在綁定姿勢不往下垂，這個滑桿是使用者端的解法
+    springBone: { intensity: 1, gravity: 0, drag: 1, colliders: true, colliderScale: 1 },
     idleAnimation: null,
   };
 }
@@ -208,6 +238,8 @@ class ConfigStore {
       webcam: { angleX: 0, angleY: 0, angleZ: 0, posX: 0, posY: 0, posZ: 0 },
       // 五母音樣板；null 表示使用內建的共振峰合成樣板
       lipsync: { templates: null, bandCount: 24 },
+      // 身體中性原點（FR-02-76）；null 表示尚未校準，首次偵測時自動取樣
+      body: { shoulderY: null },
     });
   }
 

@@ -1,6 +1,6 @@
 {
   "name": "vrm2live",
-  "version": "0.1.0",
+  "version": "0.2.1",
   "description": "VRM 虛擬形象直播軟體（簡易版）",
   "main": "src/main/main.js",
   "private": true,
@@ -13,7 +13,49 @@
     "test:dsp": "node scripts/test-dsp.mjs",
     "make-anims": "node scripts/make-test-animations.mjs",
     "test:hotkeys": "node scripts/test-hotkeys.mjs",
-    "test": "node scripts/test-dsp.mjs && node scripts/test-hotkeys.mjs"
+    "test:body": "node scripts/test-body.mjs",
+    "icon": "node scripts/make-icon.mjs",
+    "dist": "node scripts/build.mjs && electron-builder --win nsis",
+    "test": "node scripts/test-dsp.mjs && node scripts/test-hotkeys.mjs && node scripts/test-body.mjs"
+  },
+  "build": {
+    "appId": "com.vrm2live.studio",
+    "productName": "VRM2LIVE",
+    "directories": {
+      "buildResources": "packaging",
+      "output": "dist"
+    },
+    "files": [
+      "src/main/**/*",
+      "build/**/*",
+      "package.json",
+      "!build/.test*",
+      "!**/*.map",
+      "!**/*.vrm",
+      "!node_modules/three/**",
+      "!node_modules/@pixiv/**",
+      "!node_modules/@mediapipe/**"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "packaging/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "VRM2LIVE",
+      "artifactName": "VRM2LIVE-Setup-${version}.exe"
+    }
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "^0.10.22",
@@ -24,6 +66,7 @@
   },
   "devDependencies": {
     "electron": "^38.2.2",
+    "electron-builder": "^26.15.3",
     "esbuild": "^0.25.11"
   },
   "allowScripts": {

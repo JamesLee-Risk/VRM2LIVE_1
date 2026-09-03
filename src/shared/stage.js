@@ -10,6 +10,7 @@ import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 import { VRMAnimationLoaderPlugin, VRMLookAtQuaternionProxy } from '@pixiv/three-vrm-animation';
 import { BVHLoader } from 'three/examples/jsm/loaders/BVHLoader.js';
 import { AnimationController } from './animation.js';
+import { buildRig } from './bodysolver.js';
 
 const EMPTY_SET = new Set();
 
@@ -81,6 +82,10 @@ export class Stage {
     // 由追蹤驅動的根節點位移，與使用者設定的位移分開累加
     this.trackedOffset = { x: 0, y: 0, z: 0 };
 
+    /** 身體追蹤用的骨架量測結果（FR-02-D），於 loadVRM 建立 */
+    this.rig = null;
+    this._bodyQuat = new THREE.Quaternion();
+
     this._onResize = this._onResize.bind(this);
     window.addEventListener('resize', this._onResize);
     this._onResize();
@@ -149,6 +154,13 @@ export class Stage {
     const hipsNode = vrm.humanoid.getNormalizedBoneNode('hips');
     this._restHipsPos = hipsNode ? hipsNode.position.clone() : null;
 
+    // 身體追蹤的骨架量測（FR-02-65）。必須在 rest pose 下進行，故緊接著上面做完
+    this.rig = this.measureRig();
+
+    // 記住模型原本的搖動骨骼參數，之後的倍率一律以這份為基準，
+    // 否則反覆調整滑桿會把倍率一次次疊乘上去（FR-01-13）
+    this._captureSpringDefaults();
+
     this.animator = new AnimationController(vrm);
     this._applyTransform();
     return vrm;
@@ -216,10 +228,257 @@ export class Stage {
     set('rightLowerArm', 0, -8, -6);
   }
 
+
+  /**
+   * 量測骨架，供身體追蹤解算使用（FR-02-D、FR-02-65）。
+   *
+   * 不硬編碼座標軸：基底與每根骨骼的骨節方向都自模型的 rest pose 量出來，
+   * 因此 VRM 0.x（預設朝 -Z）與 1.0（朝 +Z）走的是同一條程式路徑。
+   *
+   * @returns {object|null} 缺少必要骨骼時回傳 null（該模型無法做身體追蹤）
+   */
+  measureRig() {
+    const vrm = this.vrm;
+    if (!vrm) return null;
+
+    vrm.humanoid.resetNormalizedPose();
+    const hips = vrm.humanoid.getNormalizedBoneNode('hips');
+    if (!hips) return null;
+    hips.updateWorldMatrix(true, true);
+
+    // 正規化骨架在 rest pose 下每根骨骼的局部旋轉都是單位四元數，
+    // 因此所有骨骼的世界旋轉都等於 rig 根節點的旋轉。把它除掉之後，
+    // 解算器的四元數鏈就能從單位四元數開始累乘，不必再處理根節點朝向。
+    const rootInv = new THREE.Quaternion();
+    hips.getWorldQuaternion(rootInv);
+    rootInv.invert();
+
+    const nodes = new Map();
+    for (const bone of Object.keys(vrm.humanoid.humanBones)) {
+      const node = vrm.humanoid.getNormalizedBoneNode(bone);
+      if (node) nodes.set(bone, node);
+    }
+    // 父骨骼由實際的場景圖往上找，不寫死 Humanoid 階層——
+    // 缺 upperChest、缺肩膀的模型才能自動退化（FR-02-77）
+    const boneOf = new Map();
+    for (const [bone, node] of nodes) boneOf.set(node, bone);
+
+    const info = new Map();
+    for (const [bone, node] of nodes) {
+      const pos = new THREE.Vector3()
+        .setFromMatrixPosition(node.matrixWorld)
+        .applyQuaternion(rootInv);
+      let parent = null;
+      for (let p = node.parent; p; p = p.parent) {
+        if (boneOf.has(p)) { parent = boneOf.get(p); break; }
+      }
+      info.set(bone, { pos, parent });
+    }
+
+    return buildRig(info);
+  }
+
+  /**
+   * 套用身體追蹤姿態（FR-02-D）。
+   *
+   * 呼叫時骨骼上已是基準待機姿勢，因此權重未滿時的球面插值
+   * 正好就是「模式切換淡接」與「切回僅臉部時平順回到待機姿勢」（FR-02-68）。
+   *
+   * @param {{bones: Record<string, number[]>, weight: number}} body
+   * @param {Set<string>} ownedBones 動畫接管的骨骼，不得覆寫（FR-02-66）
+   */
+  _applyBodyPose(body, ownedBones) {
+    const vrm = this.vrm;
+    const w = Math.min(1, body.weight ?? 1);
+    for (const bone in body.bones) {
+      if (ownedBones.has(bone)) continue;
+      const node = vrm.humanoid.getNormalizedBoneNode(bone);
+      if (!node) continue;
+      this._bodyQuat.fromArray(body.bones[bone]);
+      if (w >= 0.999) node.quaternion.copy(this._bodyQuat);
+      else node.quaternion.slerp(this._bodyQuat, w);
+    }
+  }
+
+
+  // ── 搖動骨骼 SpringBone（FR-01-13）────────────────────────
+
+  /** 快取模型原始的搖動參數，作為倍率的基準 */
+  _captureSpringDefaults() {
+    const mgr = this.vrm?.springBoneManager;
+    this._springDefaults = mgr
+      ? [...mgr.joints].map((joint) => ({
+        joint,
+        stiffness: joint.settings.stiffness,
+        gravityPower: joint.settings.gravityPower,
+        dragForce: joint.settings.dragForce,
+        colliderGroups: joint.colliderGroups,
+      }))
+      : null;
+
+    // 碰撞體是多個關節共用的物件，要去重收集，否則半徑倍率會被重複套用
+    const shapes = new Set();
+    for (const d of this._springDefaults ?? []) {
+      for (const g of d.colliderGroups ?? []) {
+        for (const c of g.colliders ?? []) {
+          if (c.shape && typeof c.shape.radius === 'number') shapes.add(c.shape);
+        }
+      }
+    }
+    this._colliderDefaults = [...shapes].map((shape) => ({ shape, radius: shape.radius }));
+  }
+
+  /**
+   * 模型原始搖動參數的摘要，供 UI 診斷顯示。
+   *
+   * 「頭髮往上飄」的回報幾乎都要靠這幾個數字才判斷得出是模型設定還是程式問題，
+   * 所以直接顯示在介面上，使用者回報時能一起附上。
+   */
+  getSpringBoneInfo() {
+    const d = this._springDefaults;
+    if (!d?.length) return { count: 0 };
+    const range = (key) => {
+      const v = d.map((x) => x[key]);
+      return [Math.min(...v), Math.max(...v)];
+    };
+    return {
+      count: d.length,
+      stiffness: range('stiffness'),
+      gravityPower: range('gravityPower'),
+      dragForce: range('dragForce'),
+      colliderGroups: d.reduce((n, x) => n + (x.colliderGroups?.length ?? 0), 0),
+      colliderRadius: this._colliderDefaults?.length
+        ? [Math.min(...this._colliderDefaults.map((c) => c.radius)),
+          Math.max(...this._colliderDefaults.map((c) => c.radius))]
+        : null,
+    };
+  }
+
+  /**
+   * 套用搖動骨骼設定（FR-01-13）。
+   *
+   * @param {object} s
+   * @param {number} [s.intensity]  硬度倍率 0–2；越高越貼合原姿勢、擺動越小
+   * @param {number} [s.gravity]    **追加**重力 0–1
+   * @param {number} [s.drag]       阻尼倍率 0–2，結果限幅於 0–1
+   * @param {boolean} [s.colliders]    碰撞體開關
+   * @param {number}  [s.colliderScale] 碰撞體半徑倍率 0.2–1.5
+   */
+  setSpringBone({ intensity = 1, gravity = 0, drag = 1, colliders = true, colliderScale = 1 } = {}) {
+    // 碰撞體過大是頭髮「靜止位置被墊高」的直接成因：實測有模型的頭部碰撞體
+    // 半徑達 0.467 m，把瀏海整整撐高 22.8 cm。縮半徑比整個關掉好，
+    // 因為關掉之後頭髮會直接穿過頭部。
+    for (const c of this._colliderDefaults ?? []) {
+      c.shape.radius = c.radius * (colliders ? colliderScale : 1);
+    }
+    if (!this._springDefaults) return;
+    for (const d of this._springDefaults) {
+      d.joint.settings.stiffness = d.stiffness * intensity;
+      // 重力是「加」而不是「乘」：多數製作工具匯出的 gravityPower 就是 0
+      //（本專案的範例模型 122 個關節全部為 0），乘上任何倍率仍然是 0。
+      // 而頭髮停在綁定姿勢、不往下垂的症狀，正是零重力才會出現的。
+      d.joint.settings.gravityPower = d.gravityPower + gravity;
+      d.joint.settings.dragForce = Math.min(1, Math.max(0, d.dragForce * drag));
+      d.joint.colliderGroups = colliders ? d.colliderGroups : [];
+    }
+  }
+
+
+  /**
+   * 模型的世界邊界（供取景判斷與自動配置使用）。
+   *
+   * **不使用** `Box3.setFromObject()`：它對蒙皮網格取的是
+   * `geometry.computeBoundingBox()` 的結果，而該方法會把**所有 morph target
+   * 的極值**一起算進去。表情數量多的模型因此會量出離譜的尺寸——實測一個
+   * 1.62 公尺的模型被算成 13 公尺，連帶讓自動配置做出錯誤決定。
+   *
+   * 這裡只取 position 屬性本身的極值（等同綁定姿勢的輪廓），再乘上世界矩陣。
+   * 結果與直接解析 glTF accessor 的 min/max 一致。
+   */
+  getModelBounds() {
+    if (!this.vrm) return null;
+    this.vrm.scene.updateMatrixWorld(true);
+
+    const box = new THREE.Box3();
+    const local = new THREE.Box3();
+    const v = new THREE.Vector3();
+    let found = false;
+
+    this.vrm.scene.traverse((obj) => {
+      const geo = obj.geometry;
+      if (!geo?.attributes?.position) return;
+
+      // 每個 geometry 只算一次，之後沿用
+      let raw = geo.userData.__basePoseBox;
+      if (!raw) {
+        const pos = geo.attributes.position;
+        local.makeEmpty();
+        for (let i = 0; i < pos.count; i += 1) {
+          local.expandByPoint(v.fromBufferAttribute(pos, i));
+        }
+        raw = local.clone();
+        geo.userData.__basePoseBox = raw;
+      }
+      box.union(raw.clone().applyMatrix4(obj.matrixWorld));
+      found = true;
+    });
+
+    if (!found || box.isEmpty()) return null;
+    const size = new THREE.Vector3();
+    box.getSize(size);
+    return { min: box.min.clone(), max: box.max.clone(), size, height: size.y };
+  }
+
+  /**
+   * 搖動骨骼與碰撞體的關係診斷。
+   *
+   * 回報「有多少搖動骨骼的根部落在某個碰撞體內部」——這是頭髮被碰撞體
+   * 推開後回不去、看起來浮在半空的直接成因，光看參數表看不出來。
+   */
+  getSpringColliderDiagnosis() {
+    const mgr = this.vrm?.springBoneManager;
+    if (!mgr) return null;
+
+    this.vrm.scene.updateMatrixWorld(true);
+    const jointPos = new THREE.Vector3();
+    const colliderPos = new THREE.Vector3();
+    let inside = 0;
+    let total = 0;
+    let worstOverlap = 0;
+
+    for (const joint of mgr.joints) {
+      total += 1;
+      jointPos.setFromMatrixPosition(joint.bone.matrixWorld);
+      for (const group of joint.colliderGroups ?? []) {
+        for (const collider of group.colliders ?? []) {
+          const shape = collider.shape;
+          const radius = shape?.radius;
+          if (radius == null) continue;
+          collider.updateWorldMatrix?.(true, false);
+          colliderPos.setFromMatrixPosition(collider.matrixWorld);
+          if (shape.offset) colliderPos.add(shape.offset.clone().applyQuaternion(
+            collider.getWorldQuaternion(new THREE.Quaternion())
+          ));
+          const d = jointPos.distanceTo(colliderPos);
+          const overlap = radius + joint.settings.hitRadius - d;
+          if (overlap > 0) {
+            inside += 1;
+            worstOverlap = Math.max(worstOverlap, overlap);
+            break;
+          }
+        }
+      }
+    }
+    return { total, inside, worstOverlap };
+  }
+
   disposeVRM() {
     if (!this.vrm) return;
     this.animator?.dispose();
     this.animator = null;
+    this.rig = null;
+    this._springDefaults = null;
+    this._colliderDefaults = null;
     this.scene.remove(this.vrm.scene);
     VRMUtils.deepDispose(this.vrm.scene);
     this.vrm = null;
@@ -280,12 +539,13 @@ export class Stage {
    * @param {object} [opts]
    * @param {number} [opts.dt]    推進動畫用的時間差（工作室端）
    * @param {object} [opts.pose]  外部餵入的動畫姿勢（OBS 輸出頁面端）
+   * @param {object} [opts.body]  身體追蹤姿態（FR-02-D），兩端皆由主視窗解算
    */
   applySolved(resolved, opts = {}) {
     const vrm = this.vrm;
     if (!vrm) return;
 
-    const { dt = 0, pose = null } = opts;
+    const { dt = 0, pose = null, body = null } = opts;
 
     // 先把 humanoid 回到 rest pose，否則骨骼旋轉會逐幀累加。
     //
@@ -324,6 +584,12 @@ export class Stage {
       ownedBones = new Set(Object.keys(pose));
     }
 
+    // ── 身體追蹤層（P2，FR-02-D）──
+    // 必須在逐軸映射之前：頭部追蹤等映射以 += 疊加於此姿態之上（FR-02-67）
+    if (body?.bones && (body.weight ?? 0) > 0.0005) {
+      this._applyBodyPose(body, ownedBones);
+    }
+
     this.trackedOffset.x = 0;
     this.trackedOffset.y = 0;
     this.trackedOffset.z = 0;
@@ -356,6 +622,9 @@ export class Stage {
         this.trackedOffset[key.slice(sep1 + 1)] = value;
       }
     }
+
+    // 全身模式的蹲下／起立（FR-02-63）疊加在映射的根節點位移之上
+    if (body?.rootY) this.trackedOffset.y += body.rootY * (body.weight ?? 1);
 
     if (vrm.lookAt) {
       if (lookYaw !== null) vrm.lookAt.yaw = lookYaw;
@@ -439,6 +708,17 @@ export class Stage {
     }
   }
 
+  /**
+   * 套用模型變換。位移就是**世界座標的位移**，不隨縮放改變語意。
+   *
+   * 早期版本曾把「縮放支點」折進這個公式（pos = t + (1−s)(p − t)），
+   * 副作用是 t 變成「縮放前的座標」：縮放 0.32 倍的模型，t.y 會膨脹到 −7.9，
+   * 之後只要再動一點點縮放，模型就會被甩出畫面好幾公尺。實測就是這樣讓
+   * 一個 3.3 公尺高的模型「不見了」。
+   *
+   * 支點修正改到「縮放發生的當下」做（見 setScaleKeepingView），
+   * t 因此永遠是有界的世界座標，滑桿與拖曳的語意也才一致。
+   */
   _applyTransform() {
     if (!this.vrm) return;
     const t = this.modelTransform;
@@ -446,6 +726,53 @@ export class Stage {
     this.vrm.scene.position.set(t.x + o.x, t.y + o.y, t.z + o.z);
     this.vrm.scene.rotation.y = (this._baseRotationY ?? 0) + THREE.MathUtils.degToRad(t.rotY);
     this.vrm.scene.scale.setScalar(t.scale);
+  }
+
+  /**
+   * 改變縮放，並讓「攝影機正在看的那一點」留在原地（FR-01-11）。
+   *
+   * 推導：世界座標 world(L) = t + s·R·L。設目前位於支點 p 的模型點為 L₀，
+   * 則 R·L₀ = (p − t)/s₁；縮放為 s₂ 後要 t′ + s₂·R·L₀ = p，
+   * 得 t′ = p − (s₂/s₁)·(p − t)。與旋轉無關，故對任何朝向都成立。
+   */
+  setScaleKeepingView(newScale) {
+    const t = this.modelTransform;
+    const s1 = t.scale || 1;
+    const s2 = Math.max(0.2, Math.min(4, newScale));
+    const p = this.cameraTarget;
+    const k = s2 / s1;
+    t.x = p.x - k * (p.x - t.x);
+    t.y = p.y - k * (p.y - t.y);
+    t.z = p.z - k * (p.z - t.z);
+    t.scale = s2;
+    this._applyTransform();
+    return t;
+  }
+
+  /**
+   * 依模型實際高度自動配置縮放與位置（FR-01-11）。
+   *
+   * 攝影機取景預設是以「身高約 1.6 公尺的人形」寫死的。實測匯入的模型
+   * 從 0.55 到 3.33 公尺都有，差到兩倍以上時畫面上根本看不到人。
+   *
+   * @returns {{scale:number, sourceHeight:number}|null}
+   */
+  fitModel(targetHeight = 1.6) {
+    const b = this.getModelBounds();
+    if (!b || b.height < 1e-4) return null;
+
+    const t = this.modelTransform;
+    // 先取快照：b 是「套用目前變換之後」的世界邊界，要先還原成模型本身的尺寸
+    const oldScale = t.scale || 1;
+    const sourceHeight = b.height / oldScale;
+    const sourceMinY = (b.min.y - t.y) / oldScale;
+
+    t.scale = Math.max(0.2, Math.min(4, targetHeight / sourceHeight));
+    t.x = 0;
+    t.z = 0;
+    t.y = -sourceMinY * t.scale; // 腳底落在 y = 0
+    this._applyTransform();
+    return { scale: t.scale, sourceHeight };
   }
 
   setModelTransform(patch) {

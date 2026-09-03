@@ -21,6 +21,7 @@
         <nav class="tabs" role="tablist">
           <button class="tab active" data-tab="model" role="tab">模型</button>
           <button class="tab" data-tab="tracking" role="tab">追蹤</button>
+          <button class="tab" data-tab="body" role="tab">身體</button>
           <button class="tab" data-tab="expression" role="tab">表情</button>
           <button class="tab" data-tab="animation" role="tab">動畫</button>
           <button class="tab" data-tab="hotkey" role="tab">熱鍵</button>
@@ -152,6 +153,106 @@
               <input type="range" class="sens" data-sens="mouth" min="0" max="3" step="0.1" value="1" /></div>
           </section>
 
+          <!-- 身體（FR-02-D） -->
+          <section class="panel" data-panel="body">
+            <p class="hint">
+              選擇追蹤範圍。預設只追蹤臉部與連動的軀幹；切換後會沿用同一支攝影機，
+              不需重新開啟追蹤。
+            </p>
+            <div class="body-modes">
+              <button class="body-mode" data-body-mode="face">
+                僅臉部＋軀幹<small>預設，回到原本行為</small>
+              </button>
+              <button class="body-mode" data-body-mode="half">
+                半身追蹤<small>肩、手臂、十指、胸腹腰</small>
+              </button>
+              <button class="body-mode" data-body-mode="full">
+                全身追蹤<small>再加上髖、雙腿、腳掌</small>
+              </button>
+            </div>
+
+            <div class="body-detect">
+              <span class="det" id="body-det-body">身體</span>
+              <span class="det" id="body-det-left">左手</span>
+              <span class="det" id="body-det-right">右手</span>
+              <span class="det-fps">取樣 <output id="out-body-fps">--</output> FPS</span>
+            </div>
+            <p class="hint" id="body-status-msg"></p>
+
+            <p class="privacy-note">
+              身體與手部追蹤沿用臉部追蹤的同一份攝影機串流，同樣不顯示任何影像（FR-02-20）。
+            </p>
+
+            <h4>追蹤部位</h4>
+            <div class="field checkbox">
+              <label><input type="checkbox" data-body-part="torso" checked /> 軀幹（腰、腹、胸）</label>
+            </div>
+            <div class="field checkbox">
+              <label><input type="checkbox" data-body-part="shoulders" checked /> 肩膀</label>
+            </div>
+            <div class="field checkbox">
+              <label><input type="checkbox" data-body-part="arms" checked /> 手臂與手腕</label>
+            </div>
+            <div class="field checkbox">
+              <label><input type="checkbox" data-body-part="hands" checked /> 手指（每手 15 根骨骼）</label>
+            </div>
+            <div class="field checkbox">
+              <label><input type="checkbox" data-body-part="legs" checked /> 腿部與腳掌（僅全身模式）</label>
+            </div>
+            <div class="field checkbox">
+              <label><input type="checkbox" data-body-part="rootMotion" /> 蹲下／起立（根節點升降，僅全身模式）</label>
+            </div>
+
+            <h4>靈敏度</h4>
+            <div class="field"><label>軀幹 <output id="out-body-sens-torso">1.0</output></label>
+              <input type="range" class="body-sens" data-body-sens="torso" min="0" max="2" step="0.1" value="1" /></div>
+            <div class="field"><label>肩膀 <output id="out-body-sens-shoulders">1.0</output></label>
+              <input type="range" class="body-sens" data-body-sens="shoulders" min="0" max="2" step="0.1" value="1" /></div>
+            <div class="field"><label>手臂 <output id="out-body-sens-arms">1.0</output></label>
+              <input type="range" class="body-sens" data-body-sens="arms" min="0" max="2" step="0.1" value="1" /></div>
+            <div class="field"><label>手掌 <output id="out-body-sens-hands">1.0</output></label>
+              <input type="range" class="body-sens" data-body-sens="hands" min="0" max="2" step="0.1" value="1" /></div>
+            <div class="field"><label>手指 <output id="out-body-sens-fingers">1.0</output></label>
+              <input type="range" class="body-sens" data-body-sens="fingers" min="0" max="2" step="0.1" value="1" /></div>
+            <div class="field"><label>腿部 <output id="out-body-sens-legs">1.0</output></label>
+              <input type="range" class="body-sens" data-body-sens="legs" min="0" max="2" step="0.1" value="1" /></div>
+
+            <h4>效能與手感</h4>
+            <div class="field">
+              <label>身體取樣 FPS <output id="out-body-fps-set">30</output></label>
+              <input type="range" id="body-fps" min="10" max="60" step="5" value="30" />
+            </div>
+            <div class="field">
+              <label>姿態模型精度</label>
+              <select id="body-quality">
+                <option value="lite">輕量（較快）</option>
+                <option value="full">標準（較準）</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>平滑度 <output id="out-body-smooth">45</output></label>
+              <input type="range" id="body-smooth" min="0" max="100" step="5" value="45" />
+            </div>
+            <div class="field">
+              <label>模式切換淡接秒數 <output id="out-body-fade">0.35</output></label>
+              <input type="range" id="body-fade" min="0.05" max="2" step="0.05" value="0.35" />
+            </div>
+            <div class="field">
+              <label>手腕扭轉讓給前臂 <output id="out-body-twist">0.5</output></label>
+              <input type="range" id="body-twist" min="0" max="1" step="0.05" value="0.5" />
+            </div>
+
+            <div class="row-actions">
+              <button id="btn-body-calibrate">以當前姿勢校準</button>
+              <button id="btn-body-reset-cal">重設校準</button>
+            </div>
+
+            <p class="hint">
+              單一攝影機對前後深度本質上不準；快速動作、雙手交疊、下半身在畫面外或桌子底下時
+              精度會明顯下降（規格 L-06、L-07）。全身模式請讓攝影機拍得到整個人。
+            </p>
+          </section>
+
           <!-- 表情 -->
           <section class="panel" data-panel="expression">
             <div class="row-actions">
@@ -229,6 +330,13 @@
             </div>
             <div id="hotkey-conflicts" class="notes hidden"></div>
             <div id="hotkey-register-status" class="notes hidden"></div>
+            <p class="hint">
+              熱鍵預設<b>只在本視窗聚焦時生效</b>，不會影響你在其他程式打字。
+              直播時需要切到其他視窗也能觸發，才勾選該熱鍵的「系統全域」——
+              但勾了之後<b>那個按鍵在所有程式裡都會被攔截</b>，
+              所以請盡量搭配 Ctrl／Alt 或改綁小鍵盤，不要單獨綁一般字母或數字。
+              「跨模型」則是另一件事：指這個熱鍵不隨模型切換而失效。
+            </p>
             <p class="hint">
               小鍵盤數字可獨立綁定（顯示為「小鍵盤1」），與主鍵盤數字列互不衝突。
               可搭配最多兩個修飾鍵，例如 <code>Ctrl + 小鍵盤1</code>，避免打字時誤觸。
@@ -319,7 +427,65 @@
             <div class="field checkbox">
               <label><input type="checkbox" id="chk-lock-model" /> 鎖定模型位置</label>
             </div>
-            <p class="hint">拖曳＝移動、滾輪＝縮放、右鍵拖曳＝旋轉。</p>
+
+            <div class="field">
+              <label>縮放 <output id="out-model-scale">1.00</output>×</label>
+              <input type="range" id="model-scale" min="0.2" max="4" step="0.01" value="1" />
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label>位置 X <output id="out-model-x">0.00</output></label>
+                <input type="range" id="model-x" min="-1.5" max="1.5" step="0.01" value="0" />
+              </div>
+              <div class="field">
+                <label>位置 Y <output id="out-model-y">0.00</output></label>
+                <input type="range" id="model-y" min="-1.5" max="1.5" step="0.01" value="0" />
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label>位置 Z <output id="out-model-z">0.00</output></label>
+                <input type="range" id="model-z" min="-1.5" max="1.5" step="0.01" value="0" />
+              </div>
+              <div class="field">
+                <label>旋轉 <output id="out-model-roty">0</output>°</label>
+                <input type="range" id="model-roty" min="-180" max="180" step="1" value="0" />
+              </div>
+            </div>
+
+            <h4>搖動骨骼（SpringBone）</h4>
+            <p class="hint" id="spring-info">（未載入模型）</p>
+            <div class="field">
+              <label>硬度倍率 <output id="out-spring-intensity">1.00</output></label>
+              <input type="range" id="spring-intensity" min="0" max="2" step="0.05" value="1" />
+            </div>
+            <div class="field">
+              <label>追加重力 <output id="out-spring-gravity">0.00</output></label>
+              <input type="range" id="spring-gravity" min="0" max="1" step="0.02" value="0" />
+            </div>
+            <div class="field">
+              <label>阻尼倍率 <output id="out-spring-drag">1.00</output></label>
+              <input type="range" id="spring-drag" min="0" max="2" step="0.05" value="1" />
+            </div>
+            <div class="field checkbox">
+              <label><input type="checkbox" id="chk-spring-colliders" checked /> 啟用碰撞體</label>
+            </div>
+            <div class="field">
+              <label>碰撞體半徑倍率 <output id="out-spring-collider-scale">1.00</output></label>
+              <input type="range" id="spring-collider-scale" min="0.2" max="1.5" step="0.05" value="1" />
+            </div>
+            <p class="hint">
+              頭髮不往下垂、停在半空或往上翹，有兩個常見原因：
+              模型的 <code>gravityPower</code> 為 0（很多匯出工具的預設值）→ 調高「追加重力」，0.1～0.3 通常就夠；
+              或是模型的<b>碰撞體半徑過大</b>把頭髮整片撐開 → 調低「碰撞體半徑倍率」。
+              後者比直接取消勾選「啟用碰撞體」好，因為關掉之後頭髮會直接穿過頭部。
+            </p>
+            <button id="btn-spring-reset">重設搖動骨骼設定</button>
+
+            <p class="hint">
+              畫面上可直接操作：拖曳＝移動、右鍵拖曳＝旋轉、<b>滾輪＝縮放</b>、
+              <b>Ctrl＋滾輪＝精細縮放</b>（每格 1.5%，滾輪單獨用是 6%）。
+            </p>
             <button id="btn-reset-transform">重設模型變換</button>
           </section>
 

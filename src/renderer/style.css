@@ -925,3 +925,83 @@ body.stream-mode #stage-area {
 .hidden {
   display: none !important;
 }
+
+/* ── 身體追蹤（FR-02-D）───────────────────────────────── */
+
+.body-modes {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.body-mode {
+  display: block;
+  width: 100%;
+  padding: 9px 11px;
+  text-align: left;
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.body-mode small {
+  display: block;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.body-mode:hover {
+  border-color: var(--accent-dim);
+}
+
+.body-mode.active {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+}
+
+.body-mode.active small {
+  color: #cfe3ff;
+}
+
+.body-detect {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.body-detect .det {
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--bg-input);
+  border: 1px solid var(--line);
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+/* 偵測到才亮起——沒偵測到時保持暗色，避免誤以為在動 */
+.body-detect .det.on {
+  background: rgba(79, 201, 138, 0.16);
+  border-color: var(--ok);
+  color: var(--ok);
+}
+
+.body-detect .det-fps {
+  margin-left: auto;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+/* 兩欄並排的欄位（模型變換的 X/Y、Z/旋轉）*/
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.field-row .field {
+  min-width: 0;
+}

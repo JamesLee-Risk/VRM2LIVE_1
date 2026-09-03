@@ -9,7 +9,7 @@
 /**
  * 熱鍵動作清單 — FR-07-B。
  *
- * 對應規格的 14 種動作。`target` 標示該動作需要哪一種目標，
+ * 對應規格的 15 種動作。`target` 標示該動作需要哪一種目標，
  * 供介面決定要顯示哪個下拉選單。
  */
 export const HOTKEY_ACTIONS = {
@@ -27,6 +27,7 @@ export const HOTKEY_ACTIONS = {
   TakeScreenshot: { code: 11, label: '拍攝截圖', target: null },
   ToggleTracker: { code: 12, label: '開關追蹤來源', target: 'tracker' },
   PlaySound: { code: 13, label: '播放音效', target: 'sound', requires: 'FR-13' },
+  ChangeBodyMode: { code: 14, label: '切換身體追蹤模式', target: 'bodyMode' },
 };
 
 /** 畫面按鈕上限（規格 L-20） */
@@ -192,7 +193,17 @@ export function createHotkey(id, patch = {}) {
     id,
     name: '新熱鍵',
     enabled: true,
+    /** 跨模型保留（FR-07-07），與下面的 systemWide 無關 */
     global: false,
+    /**
+     * 是否註冊為**系統層級**快捷鍵（FR-07-01）。
+     *
+     * 預設關閉，這是刻意的：Electron 的 globalShortcut 會把按鍵從整個作業系統
+     * **攔截**走，被綁定的鍵在任何程式裡都打不出來。使用者只綁一個 `1`
+     * 就再也無法在別的地方輸入 1，而且完全看不出原因。
+     * 關閉時改由視窗聚焦下的鍵盤事件觸發，不影響其他程式。
+     */
+    systemWide: false,
     trigger: { keys: [], mouse: null, screenButton: null },
     actions: [],
     cooldown: 0,
@@ -352,14 +363,31 @@ export class HotkeyEngine {
   }
 
   /** 需要註冊為全域快捷鍵的項目（交給主行程） */
+  /**
+   * 需要註冊到作業系統的熱鍵（FR-07-01）。
+   *
+   * **只回傳明確勾選 systemWide 者。** 全部註冊會讓每個被綁定的按鍵
+   * 在所有程式裡失效，使用者連字都打不了。
+   */
   globalBindings() {
     const out = [];
     for (const hk of this.hotkeys) {
-      if (hk.enabled === false) continue;
+      if (hk.enabled === false || !hk.systemWide) continue;
       const accelerator = toAccelerator(hk.trigger?.keys ?? []);
       if (accelerator) out.push({ id: hk.id, accelerator });
     }
     return out;
+  }
+
+  /**
+   * 以鍵盤事件比對熱鍵（視窗聚焦時使用）。
+   * 已註冊為系統層級者不由此路徑觸發，否則聚焦時會觸發兩次。
+   */
+  findByEvent(event) {
+    const accelerator = toAccelerator(keysFromEvent(event));
+    if (!accelerator) return null;
+    const hk = this.findByAccelerator(accelerator);
+    return hk && !hk.systemWide ? hk : null;
   }
 }
 

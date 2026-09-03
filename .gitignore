@@ -32,3 +32,6 @@ Animations/*
 # 暫存
 *.tmp
 *.log
+
+# electron-builder 產物
+dist/

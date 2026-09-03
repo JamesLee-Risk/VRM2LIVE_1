@@ -68,9 +68,10 @@ function connect() {
     if (msg.type === 'scene') {
       await applyScene(msg.payload);
     } else if (msg.type === 'state') {
-      // __pose 為主視窗算好的動畫骨骼姿勢；此頁不重跑動畫時間軸
-      const { __pose: pose, ...resolved } = msg.payload;
-      stage.applySolved(resolved, { pose: pose ?? null });
+      // __pose 為主視窗算好的動畫骨骼姿勢，__body 為身體追蹤姿態（FR-02-D）。
+      // 兩者都已在主視窗解算完畢，此頁不重跑動畫時間軸也不重跑姿態估計（FR-02-79）
+      const { __pose: pose, __body: body, ...resolved } = msg.payload;
+      stage.applySolved(resolved, { pose: pose ?? null, body: body ?? null });
       if (!receivedFirstState) {
         receivedFirstState = true;
         setStatus('', true);
@@ -96,6 +97,8 @@ async function applyScene(scene) {
       await stage.loadVRM(scene.modelUrl);
     }
 
+    // 必須在模型載入之後：setSpringBone 用的是 loadVRM 當下快取的原始參數
+    if (scene.springBone) stage.setSpringBone(scene.springBone);
     if (scene.transform) stage.setModelTransform(scene.transform);
     if (scene.camera?.preset) stage.applyCameraPreset(scene.camera.preset);
     if (scene.lighting) stage.setLighting(scene.lighting);

@@ -18,6 +18,15 @@ const ROOT_DIR = app.isPackaged ? path.dirname(app.getPath('exe')) : path.join(_
 const BUILD_DIR = path.join(__dirname, '..', '..', 'build');
 const LOG_DIR = path.join(ROOT_DIR, 'Logs');
 
+// Chromium 預設會對背景／被遮蔽的視窗做節流：計時器降頻、rAF 幾乎停擺。
+// 本應用程式的追蹤與解算都跑在主視窗的 rAF 裡，OBS 瀏覽器來源只是被動接收
+// 廣播出去的結果——主視窗一旦被別的視窗蓋住，輸出畫面就跟著凍結。
+// 直播時使用者本來就會去操作別的程式，所以這三個開關是必要的，不是最佳化。
+// 必須在 app ready 之前設定才會生效。
+app.commandLine.appendSwitch('disable-background-timer-throttling');
+app.commandLine.appendSwitch('disable-renderer-backgrounding');
+app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
+
 let mainWindow = null;
 let store = null;
 let outputServer = null;
@@ -59,6 +68,9 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
+      // 與上面三個命令列開關搭配：視窗失去焦點或被遮蔽時仍維持正常更新率，
+      // 否則 OBS 瀏覽器來源會在使用者切到其他程式時停格
+      backgroundThrottling: false,
     },
   });
 
@@ -87,6 +99,7 @@ function createWindow() {
       // 追加一項只有主行程能驗證的檢查：真的開一個瀏覽器來源頁面，
       // 確認它會連上 WebSocket、收到場景、並把模型載起來（FR-15-01／FR-15-02）。
       result.checks.push(await verifyOutputPage());
+      result.checks.push(await verifyBackgroundTicking());
       result.pass = result.checks.every((c) => c.ok);
 
       console.log('\n===== SELFTEST RESULT =====');
@@ -114,6 +127,47 @@ function createWindow() {
  * 以一個隱藏視窗模擬 OBS 瀏覽器來源，驗證輸出管線確實可用。
  * 僅在 --selftest 時呼叫。
  */
+/**
+ * FR-15-02：主視窗被遮蔽時，解算與廣播仍須持續。
+ *
+ * 直接重現使用者回報的情境——把視窗藏起來（比「不在最上層」更嚴苛，
+ * Chromium 會視為完全遮蔽），量 renderer 的實際幀數有沒有繼續累加。
+ * 只檢查設定值是驗不出來的：節流是否生效取決於命令列開關、webPreferences
+ * 與平台三者的組合。
+ */
+async function verifyBackgroundTicking() {
+  const id = 'FR-15-02c';
+  const desc = '主視窗被遮蔽時仍持續解算與廣播';
+  if (!mainWindow) return { id, desc, ok: false, detail: '沒有主視窗' };
+
+  const read = async () => {
+    const v = await mainWindow.webContents.executeJavaScript('window.__vrm2liveFrames ?? -1');
+    return Number(v);
+  };
+
+  try {
+    const wasVisible = mainWindow.isVisible();
+    const before = await read();
+    if (before < 0) return { id, desc, ok: false, detail: 'renderer 未提供幀計數' };
+
+    mainWindow.hide();
+    await new Promise((r) => setTimeout(r, 1500));
+    const after = await read();
+    if (wasVisible) mainWindow.show();
+
+    const fps = (after - before) / 1.5;
+    return {
+      id,
+      desc,
+      // 節流生效時通常會掉到 1 FPS 以下；這裡取寬鬆的 20 FPS 門檻
+      ok: fps >= 20,
+      detail: `遮蔽 1.5 秒期間 ${after - before} 幀（約 ${fps.toFixed(0)} FPS）`,
+    };
+  } catch (err) {
+    return { id, desc, ok: false, detail: err.message };
+  }
+}
+
 async function verifyOutputPage() {
   const check = { id: 'FR-15-02', desc: 'OBS 輸出頁面連線並載入模型（不重跑追蹤）', ok: false, detail: '' };
   if (!outputServer?.port) {
@@ -370,7 +424,22 @@ function registerIpc() {
 // 啟動
 // ────────────────────────────────────────────────────────────────
 
+/**
+ * 建立使用者資料夾（規格 §6.3）。
+ *
+ * 開發時這些資料夾隨儲存庫存在，但安裝版**不會**帶任何模型與素材
+ * （範例模型的授權禁止再散布），所以第一次啟動時目錄是空的。
+ * 先把空資料夾建出來，使用者打開安裝目錄就知道 .vrm 該放哪裡，
+ * 而不是看到一片空白再去猜。
+ */
+async function ensureUserDirs() {
+  for (const name of ['Models', 'Animations', 'Backgrounds', 'Sounds', 'Config', 'Logs', 'Backups']) {
+    await fsp.mkdir(path.join(ROOT_DIR, name), { recursive: true }).catch(() => {});
+  }
+}
+
 app.whenReady().then(async () => {
+  await ensureUserDirs();
   await initLog();
   log('info', `VRM2LIVE ${app.getVersion()} 啟動，根目錄 ${app.isPackaged ? '(打包)' : '(開發)'}`);
 

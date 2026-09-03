@@ -48,12 +48,20 @@ async function copyStaticAssets() {
     console.warn('[build] 找不到 MediaPipe wasm，請先執行 npm install');
   }
 
-  // 臉部辨識模型檔（由 scripts/fetch-assets.mjs 取得）
-  const taskSrc = path.join(root, 'vendor/face_landmarker.task');
-  if (existsSync(taskSrc)) {
-    await cp(taskSrc, path.join(outdir, 'face_landmarker.task'));
-  } else {
-    console.warn('[build] 缺少 vendor/face_landmarker.task，請執行: npm run fetch-assets');
+  // 辨識模型檔（由 scripts/fetch-assets.mjs 取得）。
+  // 缺少姿態／手部模型只會讓身體追蹤（FR-02-D）不可用，不影響臉部追蹤，故僅警告。
+  for (const name of [
+    'face_landmarker.task',
+    'pose_landmarker_lite.task',
+    'pose_landmarker_full.task',
+    'hand_landmarker.task',
+  ]) {
+    const src = path.join(root, 'vendor', name);
+    if (existsSync(src)) {
+      await cp(src, path.join(outdir, name));
+    } else {
+      console.warn(`[build] 缺少 vendor/${name}，請執行: npm run fetch-assets`);
+    }
   }
 
   // 靜態頁面

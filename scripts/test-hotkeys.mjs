@@ -207,7 +207,8 @@ record('放開時執行 stop', calls.includes('expr:angry:stop'), calls.join(' '
 console.log('\n[6] 觸發來源查找與全域註冊');
 const lookup = new H.HotkeyEngine({ executor });
 lookup.setHotkeys([
-  H.createHotkey('k', { trigger: { keys: ['Ctrl', 'KeyS'], mouse: null, screenButton: null } }),
+  H.createHotkey('k', { systemWide: true, trigger: { keys: ['Ctrl', 'KeyS'], mouse: null, screenButton: null } }),
+  H.createHotkey('local', { trigger: { keys: ['KeyJ'], mouse: null, screenButton: null } }),
   H.createHotkey('m', { trigger: { keys: [], mouse: 'middle', screenButton: null } }),
   H.createHotkey('s', { trigger: { keys: [], mouse: null, screenButton: 3 } }),
   H.createHotkey('off', { enabled: false, trigger: { keys: ['Ctrl', 'KeyQ'], mouse: null, screenButton: null } }),
@@ -216,15 +217,28 @@ record('依 accelerator 查找', lookup.findByAccelerator('Ctrl+S')?.id === 'k')
 record('依滑鼠鍵查找', lookup.findByMouse('middle')?.id === 'm');
 record('依畫面按鈕查找', lookup.findByScreenButton(3)?.id === 's');
 record('停用的熱鍵查不到', lookup.findByAccelerator('Ctrl+Q') === null);
-eq('全域註冊清單只含有效鍵盤組合', lookup.globalBindings(), [{ id: 'k', accelerator: 'Ctrl+S' }]);
+eq('系統全域註冊清單只含勾選 systemWide 者', lookup.globalBindings(), [{ id: 'k', accelerator: 'Ctrl+S' }]);
+
+// 未勾選 systemWide 的熱鍵**不得**進入系統註冊清單。全部註冊會讓被綁定的按鍵
+// 在所有程式裡都失效，使用者連字都打不出來（實際回報過的問題）。
+record('未勾選 systemWide 者不進入系統註冊',
+  lookup.globalBindings().every((b) => b.id !== 'local'));
+record('未勾選者仍可由視窗聚焦時的鍵盤事件觸發',
+  lookup.findByEvent({ code: 'KeyJ', ctrlKey: false, altKey: false, shiftKey: false, metaKey: false })?.id === 'local');
+record('已註冊為系統全域者不再由本機事件觸發（避免聚焦時觸發兩次）',
+  lookup.findByEvent({ code: 'KeyS', ctrlKey: true, altKey: false, shiftKey: false, metaKey: false }) === null);
 
 // ── 7. 動作清單完整性（FR-07-B）──
 console.log('\n[7] FR-07-B 動作清單');
 const codes = Object.values(H.HOTKEY_ACTIONS).map((a) => a.code).sort((a, b) => a - b);
 record(
-  '共 14 種動作且編號 0–13 連續',
-  codes.length === 14 && codes.every((c, i) => c === i),
+  '共 15 種動作且編號 0–14 連續',
+  codes.length === 15 && codes.every((c, i) => c === i),
   `編號 ${codes[0]}–${codes[codes.length - 1]}`
+);
+record(
+  'FR-02-D 的 ChangeBodyMode 已納入動作清單',
+  H.HOTKEY_ACTIONS.ChangeBodyMode?.target === 'bodyMode'
 );
 
 // ────────────────────────────────────────────────────────────────
